@@ -1,4 +1,5 @@
 # GenServerMagic
+[![Build Status](https://travis-ci.org/andrewtimberlake/gen_server_magic.svg?branch=master)](https://travis-ci.org/andrewtimberlake/gen_server_magic)
 
 ## Installation
 
