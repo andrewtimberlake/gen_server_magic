@@ -54,8 +54,13 @@ defmodule GenServerMagicTest do
       state
     end
 
+    defterminate(:shutdown, _state) do
+      send(self(), :shutdown)
+      :ok
+    end
+
     defterminate(reason, _state) do
-      send(self(), reason)
+      send(self(), {:other, reason})
       :ok
     end
   end
@@ -201,10 +206,14 @@ defmodule GenServerMagicTest do
       {:ok, pid} = TestModule.start_link(:state)
       assert :ok = GenServer.stop(pid, :normal)
       assert_receive :shutdown
+    end
 
-      #   {:ok, pid} = TestModule.start_link(:state)
-      #   assert :ok = GenServer.stop(pid, :shutdown)
-      #   assert_receive :shutdown
+    test "it generates multiple terminate callback" do
+      assert :ok = TestModule.Server.terminate(:reason, :state)
+
+      {:ok, pid} = TestModule.start_link(:state)
+      Process.exit(pid, :normal)
+      assert_receive {:other, :reason}
     end
   end
 end

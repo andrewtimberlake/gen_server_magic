@@ -248,7 +248,7 @@ defmodule GenServerMagic do
              end}
 
           {:terminate, reason, state, func_body} ->
-            {:terminate,
+            {{:terminate, reason},
              quote do
                # def terminate(reason, state)
                def terminate(unquote(reason), unquote(state)), do: unquote(func_body)
@@ -263,7 +263,7 @@ defmodule GenServerMagic do
       end
 
     quote do
-      # IO.puts(Macro.to_string(Macro.expand(unquote(implementation), __ENV__)))
+      # IO.puts(Macro.to_string(Macro.expand(unquote(server), __ENV__)))
 
       Module.create(
         @server_module,
