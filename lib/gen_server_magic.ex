@@ -514,6 +514,8 @@ defmodule GenServerMagic do
     |> List.to_tuple()
   end
 
+  def normalize_argument(arg, pos), do: {:=, [], [arg, {:"arg#{pos}", [], nil}]}
+
   defp normalize_argument(<<"_", arg::binary>>, _original_arg, context, _pos),
     do: {String.to_atom(arg), context, nil}
 

@@ -54,6 +54,14 @@ defmodule GenServerMagicTest do
       {:reply, name, state}
     end
 
+    defcall match_on_binary("string", state) do
+      {:reply, "matched string", state}
+    end
+
+    defcall match_on_integer(42, state) do
+      {:reply, "the answer to the question", state}
+    end
+
     defcall match_with_guard(%{name: name}, state) when is_binary(name) do
       {:reply, name, state}
     end
@@ -119,6 +127,21 @@ defmodule GenServerMagicTest do
 
     {:ok, pid} = TestModule.start_link(nil)
     assert TestModule.match_on_struct(pid, %Model{name: "Test name"}) == "Test name"
+  end
+
+  test "call with binary match" do
+    assert TestModule.Server.match_on_binary("string", nil) == {:reply, "matched string", nil}
+
+    {:ok, pid} = TestModule.start_link(nil)
+    assert TestModule.match_on_binary(pid, "string") == "matched string"
+  end
+
+  test "call with integer match" do
+    assert TestModule.Server.match_on_integer(42, nil) ==
+             {:reply, "the answer to the question", nil}
+
+    {:ok, pid} = TestModule.start_link(nil)
+    assert TestModule.match_on_integer(pid, 42) == "the answer to the question"
   end
 
   test "call with match and guard" do
