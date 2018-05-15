@@ -128,8 +128,8 @@ defmodule GenServerMagic do
 
           {:call, func_name, args, {from, state}, func_body} ->
             n_args = GenServerMagic.normalize_arguments(args)
-            n_from = GenServerMagic.normalize_argument(from)
-            n_state = GenServerMagic.normalize_argument(state)
+            n_from = GenServerMagic.normalize_argument(from, 1)
+            n_state = GenServerMagic.normalize_argument(state, 1)
 
             {{:call, func_name, length(args), 2},
              quote do
@@ -150,7 +150,7 @@ defmodule GenServerMagic do
 
           {:call, func_name, args, state, func_body} ->
             n_args = GenServerMagic.normalize_arguments(args)
-            n_state = GenServerMagic.normalize_argument(state)
+            n_state = GenServerMagic.normalize_argument(state, 1)
 
             {{:call, func_name, length(args), 1},
              quote do
@@ -171,7 +171,7 @@ defmodule GenServerMagic do
 
           {:get, func_name, args, state, func_body} ->
             n_args = GenServerMagic.normalize_arguments(args)
-            n_state = GenServerMagic.normalize_argument(state)
+            n_state = GenServerMagic.normalize_argument(state, 1)
 
             {{:call, func_name, length(args), 1},
              quote do
@@ -195,7 +195,7 @@ defmodule GenServerMagic do
 
           {:update, func_name, args, state, func_body} ->
             n_args = GenServerMagic.normalize_arguments(args)
-            n_state = GenServerMagic.normalize_argument(state)
+            n_state = GenServerMagic.normalize_argument(state, 1)
 
             {{:call, func_name, length(args), 1},
              quote do
@@ -209,7 +209,7 @@ defmodule GenServerMagic do
 
           {:cast, func_name, args, state, func_body} ->
             n_args = GenServerMagic.normalize_arguments(args)
-            n_state = GenServerMagic.normalize_argument(state)
+            n_state = GenServerMagic.normalize_argument(state, 1)
 
             {{:cast, func_name, length(args)},
              quote do
@@ -230,7 +230,7 @@ defmodule GenServerMagic do
              end}
 
           {:info, message, state, func_body} ->
-            n_state = GenServerMagic.normalize_argument(state)
+            n_state = GenServerMagic.normalize_argument(state, 1)
 
             {:info,
              quote do
@@ -263,6 +263,7 @@ defmodule GenServerMagic do
       end
 
     quote do
+      # IO.puts(Macro.to_string(Macro.expand(unquote(implementation), __ENV__)))
       # IO.puts(Macro.to_string(Macro.expand(unquote(server), __ENV__)))
 
       Module.create(
@@ -408,40 +409,41 @@ defmodule GenServerMagic do
   defp strip_expanded_arguments([], acc), do: Enum.reverse(acc)
 
   defp strip_expanded_arguments([{:=, _, [_arg, arg]} | tail], acc),
-    do: strip_expanded_arguments(tail, [normalize_argument(arg) | acc])
+    do: strip_expanded_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
 
   defp strip_expanded_arguments([arg | tail], acc),
-    do: strip_expanded_arguments(tail, [normalize_argument(arg) | acc])
+    do: strip_expanded_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
 
   @doc false
   def normalize_arguments(args, acc \\ [])
   def normalize_arguments([], acc), do: Enum.reverse(acc)
 
   def normalize_arguments([{:\\, _, [arg, _value]} | tail], acc),
-    do: normalize_arguments(tail, [normalize_argument(arg) | acc])
+    do: normalize_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
 
   def normalize_arguments([{:=, _, [_, arg]} | tail], acc),
-    do: normalize_arguments(tail, [normalize_argument(arg) | acc])
+    do: normalize_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
 
   def normalize_arguments([arg | tail], acc),
-    do: normalize_arguments(tail, [normalize_argument(arg) | acc])
+    do: normalize_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
 
   @doc false
-  def normalize_argument({:\\, _, _} = arg), do: arg
-  def normalize_argument({:=, _, [_, arg]}), do: normalize_argument(arg)
+  def normalize_argument({:\\, _, _} = arg, _pos), do: arg
+  def normalize_argument({:=, _, [_, arg]}, pos), do: normalize_argument(arg, pos)
+  def normalize_argument({:%, _, [{:__aliases__, _, _}, _arg]}, pos), do: {:"arg#{pos}", [], nil}
 
-  def normalize_argument({arg, context, nil}) when is_atom(arg) and is_list(context),
-    do: normalize_argument(Atom.to_string(arg), arg, context)
+  def normalize_argument({arg, context, nil}, pos) when is_atom(arg) and is_list(context),
+    do: normalize_argument(Atom.to_string(arg), arg, context, pos)
 
-  def normalize_argument(arg) when is_tuple(arg) do
+  def normalize_argument(arg, pos) when is_tuple(arg) do
     arg
     |> Tuple.to_list()
-    |> Enum.map(&normalize_argument/1)
+    |> Enum.map(&normalize_argument(&1, pos))
     |> List.to_tuple()
   end
 
-  defp normalize_argument(<<"_", arg::binary>>, _original_arg, context),
+  defp normalize_argument(<<"_", arg::binary>>, _original_arg, context, _pos),
     do: {String.to_atom(arg), context, nil}
 
-  defp normalize_argument(_arg, original_arg, context), do: {original_arg, context, nil}
+  defp normalize_argument(_arg, original_arg, context, _pos), do: {original_arg, context, nil}
 end

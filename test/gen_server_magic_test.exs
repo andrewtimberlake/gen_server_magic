@@ -1,8 +1,16 @@
 defmodule GenServerMagicTest do
   use ExUnit.Case
 
+  defmodule Model do
+    defstruct name: nil
+  end
+
   defmodule TestModule do
     use GenServerMagic
+
+    defserver do
+      alias GenServerMagicTest.Model
+    end
 
     definit(args) do
       {:ok, args}
@@ -40,6 +48,10 @@ defmodule GenServerMagicTest do
       Process.sleep(100)
       send(test, :done)
       {:noreply, state + 1}
+    end
+
+    defcall match_on_struct(%Model{name: name}, state) do
+      {:reply, name, state}
     end
 
     defcast cast_with_state(a, list) do
@@ -91,6 +103,14 @@ defmodule GenServerMagicTest do
     # The message has been sent
     assert_receive :done, 200
     assert TestModule.get_state(pid) == 2
+  end
+
+  test "call with struct match" do
+    assert TestModule.Server.match_on_struct(%Model{name: "Test name"}, nil) ==
+             {:reply, "Test name", nil}
+
+    {:ok, pid} = TestModule.start_link(nil)
+    assert TestModule.match_on_struct(pid, %Model{name: "Test name"}) == "Test name"
   end
 
   describe "definit/1" do
