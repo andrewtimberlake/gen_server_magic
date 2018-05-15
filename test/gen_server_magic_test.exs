@@ -54,6 +54,14 @@ defmodule GenServerMagicTest do
       {:reply, name, state}
     end
 
+    defcall match_with_guard(%{name: name}, state) when is_binary(name) do
+      {:reply, name, state}
+    end
+
+    defcall func_with_guard(atom, state) when is_atom(atom) do
+      {:reply, atom, state}
+    end
+
     defcast cast_with_state(a, list) do
       [a | list]
     end
@@ -111,6 +119,36 @@ defmodule GenServerMagicTest do
 
     {:ok, pid} = TestModule.start_link(nil)
     assert TestModule.match_on_struct(pid, %Model{name: "Test name"}) == "Test name"
+  end
+
+  test "call with match and guard" do
+    assert TestModule.Server.match_with_guard(%{name: "name"}, nil) == {:reply, "name", nil}
+
+    assert_raise FunctionClauseError, fn ->
+      TestModule.Server.match_with_guard(%{name: :name}, nil)
+    end
+
+    {:ok, pid} = TestModule.start_link(nil)
+    assert TestModule.match_with_guard(pid, %{name: "name"}) == "name"
+
+    assert_raise FunctionClauseError, fn ->
+      TestModule.match_with_guard(pid, %{name: :name})
+    end
+  end
+
+  test "call with guard" do
+    assert TestModule.Server.func_with_guard(:atom, nil) == {:reply, :atom, nil}
+
+    assert_raise FunctionClauseError, fn ->
+      TestModule.Server.func_with_guard("binary", nil)
+    end
+
+    {:ok, pid} = TestModule.start_link(nil)
+    assert TestModule.func_with_guard(pid, :atom) == :atom
+
+    assert_raise FunctionClauseError, fn ->
+      TestModule.func_with_guard(pid, "binary")
+    end
   end
 
   describe "definit/1" do

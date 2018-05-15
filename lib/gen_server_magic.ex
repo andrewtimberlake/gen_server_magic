@@ -14,6 +14,7 @@ defmodule GenServerMagic do
       Module.register_attribute(__MODULE__, :api_methods, accumulate: true)
       @gen_server_methods {:use, GenServer}
       @before_compile unquote(__MODULE__)
+      @compile :nowarn_unused_vars
 
       import Kernel, except: [defp: 2]
       import GenServerMagic
@@ -48,18 +49,34 @@ defmodule GenServerMagic do
           {:server, func_body} ->
             func_body
 
-          {:call, func_name, args, {from, state}, func_body} ->
+          {:call, func_name, args, {from, state}, func_body, nil} ->
             quote do
               # def func_name(a, b, {from, state})
               def unquote(func_name)(unquote_splicing(args), {unquote(from), unquote(state)}),
                 do: unquote(func_body)
             end
 
-          {:call, func_name, args, state, func_body} ->
+          {:call, func_name, args, {from, state}, func_body, when_clause} ->
+            quote do
+              # def func_name(a, b, {from, state})
+              def unquote(func_name)(unquote_splicing(args), {unquote(from), unquote(state)})
+                  when unquote(when_clause),
+                  do: unquote(func_body)
+            end
+
+          {:call, func_name, args, state, func_body, nil} ->
             quote do
               # def func_name(a, b, state)
               def unquote(func_name)(unquote_splicing(args), unquote(state)),
                 do: unquote(func_body)
+            end
+
+          {:call, func_name, args, state, func_body, when_clause} ->
+            quote do
+              # def func_name(a, b, state)
+              def unquote(func_name)(unquote_splicing(args), unquote(state))
+                  when unquote(when_clause),
+                  do: unquote(func_body)
             end
 
           {:defp, func_name, args, func_body} ->
@@ -68,31 +85,49 @@ defmodule GenServerMagic do
               defp unquote(func_name)(unquote_splicing(args || [])), do: unquote(func_body)
             end
 
-          {:get, func_name, args, state, func_body} ->
+          {:get, func_name, args, state, func_body, nil} ->
             quote do
               # def func_name(a, b, state)
               def unquote(func_name)(unquote_splicing(args), unquote(state)),
                 do: unquote(func_body)
             end
 
-          {:update, func_name, args, state, func_body} ->
-            # IO.puts("func_name: #{inspect(func_name)}")
-            # IO.puts("args: #{Macro.to_string(args)}")
-            # IO.puts("state: #{Macro.to_string(state)}")
-            # IO.puts("func_body: #{Macro.to_string(func_body)}")
-            # IO.puts("")
+          {:get, func_name, args, state, func_body, when_clause} ->
+            quote do
+              # def func_name(a, b, state)
+              def unquote(func_name)(unquote_splicing(args), unquote(state))
+                  when unquote(when_clause),
+                  do: unquote(func_body)
+            end
 
+          {:update, func_name, args, state, func_body, nil} ->
             quote do
               # def func_name(a, b, state)
               def unquote(func_name)(unquote_splicing(args), unquote(state)),
                 do: unquote(func_body)
             end
 
-          {:cast, func_name, args, state, func_body} ->
+          {:update, func_name, args, state, func_body, when_clause} ->
+            quote do
+              # def func_name(a, b, state)
+              def unquote(func_name)(unquote_splicing(args), unquote(state))
+                  when unquote(when_clause),
+                  do: unquote(func_body)
+            end
+
+          {:cast, func_name, args, state, func_body, nil} ->
             quote do
               # def func_name(a, b, state)
               def unquote(func_name)(unquote_splicing(args), unquote(state)),
                 do: unquote(func_body)
+            end
+
+          {:cast, func_name, args, state, func_body, when_clause} ->
+            quote do
+              # def func_name(a, b, state)
+              def unquote(func_name)(unquote_splicing(args), unquote(state))
+                  when unquote(when_clause),
+                  do: unquote(func_body)
             end
 
           {:info, message, state, func_body} ->
@@ -116,6 +151,7 @@ defmodule GenServerMagic do
           {:use, module} ->
             {:use,
              quote do
+               @compile :nowarn_unused_vars
                @moduledoc false
                use unquote(module)
              end}
@@ -126,7 +162,7 @@ defmodule GenServerMagic do
                def init(unquote_splicing(args)), do: unquote(func_body)
              end}
 
-          {:call, func_name, args, {from, state}, func_body} ->
+          {:call, func_name, args, {from, state}, func_body, _when_clause} ->
             n_args = GenServerMagic.normalize_arguments(args)
             n_from = GenServerMagic.normalize_argument(from, 1)
             n_state = GenServerMagic.normalize_argument(state, 1)
@@ -148,7 +184,7 @@ defmodule GenServerMagic do
                end
              end}
 
-          {:call, func_name, args, state, func_body} ->
+          {:call, func_name, args, state, func_body, _when_clause} ->
             n_args = GenServerMagic.normalize_arguments(args)
             n_state = GenServerMagic.normalize_argument(state, 1)
 
@@ -169,7 +205,7 @@ defmodule GenServerMagic do
                end
              end}
 
-          {:get, func_name, args, state, func_body} ->
+          {:get, func_name, args, state, func_body, _when_clause} ->
             n_args = GenServerMagic.normalize_arguments(args)
             n_state = GenServerMagic.normalize_argument(state, 1)
 
@@ -193,7 +229,7 @@ defmodule GenServerMagic do
                end
              end}
 
-          {:update, func_name, args, state, func_body} ->
+          {:update, func_name, args, state, func_body, _when_clause} ->
             n_args = GenServerMagic.normalize_arguments(args)
             n_state = GenServerMagic.normalize_argument(state, 1)
 
@@ -207,7 +243,7 @@ defmodule GenServerMagic do
                end
              end}
 
-          {:cast, func_name, args, state, func_body} ->
+          {:cast, func_name, args, state, func_body, _when_clause} ->
             n_args = GenServerMagic.normalize_arguments(args)
             n_state = GenServerMagic.normalize_argument(state, 1)
 
@@ -351,6 +387,16 @@ defmodule GenServerMagic do
   end
 
   defp define_callbacks(type, func_name, args, do: func_body) do
+    {func_name, args, when_clause} =
+      case func_name do
+        :when ->
+          [{func_name, _, args}, when_clause] = args
+          {func_name, args, when_clause}
+
+        _other ->
+          {func_name, args, nil}
+      end
+
     [state | rest] = Enum.reverse(args)
     local_args = Enum.reverse(rest)
     n_local_args = strip_expanded_arguments(local_args)
@@ -358,38 +404,60 @@ defmodule GenServerMagic do
     state = Macro.escape(state)
     func_body = Macro.escape(func_body)
     function_call = genserver_function(type)
+    escaped_when_clause = Macro.escape(when_clause)
+    has_when = !!when_clause
 
-    quote do
-      @gen_server_methods {unquote(type), unquote(func_name), unquote(server_args),
-                           unquote(state), unquote(func_body)}
+    quoted =
+      quote do
+        @gen_server_methods {unquote(type), unquote(func_name), unquote(server_args),
+                             unquote(state), unquote(func_body), unquote(escaped_when_clause)}
 
-      # Don't write an API function with the same signature (compiler warning)
-      unless Enum.find(@api_methods, fn
-               {unquote(func_name), unquote(length(local_args))} -> true
-               _ -> false
-             end) do
-        @api_methods {unquote(func_name), unquote(length(local_args))}
+        # Don't write an API function with the same signature (compiler warning)
+        unless Enum.find(@api_methods, fn
+                 {unquote(func_name), unquote(length(local_args))} -> true
+                 _ -> false
+               end) do
+          @api_methods {unquote(func_name), unquote(length(local_args))}
 
-        if @registered_name do
-          def unquote(func_name)(unquote_splicing(n_local_args)),
-            do:
-              GenServer.unquote(function_call)(
-                @registered_name,
-                {unquote(func_name), unquote(normalize_arguments(local_args))}
-              )
-        else
-          def unquote(func_name)(pid, unquote_splicing(n_local_args)) when is_pid(pid),
-            do:
-              GenServer.unquote(function_call)(
-                pid,
-                {unquote(func_name), unquote(normalize_arguments(local_args))}
-              )
+          if @registered_name do
+            if unquote(has_when) do
+              def unquote(func_name)(unquote_splicing(n_local_args)) when unquote(when_clause),
+                do:
+                  GenServer.unquote(function_call)(
+                    @registered_name,
+                    {unquote(func_name), unquote(normalize_arguments(local_args))}
+                  )
+            else
+              def unquote(func_name)(unquote_splicing(n_local_args)),
+                do:
+                  GenServer.unquote(function_call)(
+                    @registered_name,
+                    {unquote(func_name), unquote(normalize_arguments(local_args))}
+                  )
+            end
+          else
+            if unquote(has_when) do
+              def unquote(func_name)(pid, unquote_splicing(n_local_args))
+                  when is_pid(pid) and unquote(when_clause),
+                  do:
+                    GenServer.unquote(function_call)(
+                      pid,
+                      {unquote(func_name), unquote(normalize_arguments(local_args))}
+                    )
+            else
+              def unquote(func_name)(pid, unquote_splicing(n_local_args)) when is_pid(pid),
+                do:
+                  GenServer.unquote(function_call)(
+                    pid,
+                    {unquote(func_name), unquote(normalize_arguments(local_args))}
+                  )
+            end
+          end
         end
       end
 
-      # def unquote(func_name)(unquote_splicing(local_args)),
-      # do: GenServer.call(unquote(__MODULE__), {unquote(func_name), unquote(local_args)})
-    end
+    # IO.inspect(Macro.to_string(Macro.expand(quoted, __ENV__)), label: "quoted")
+    quoted
   end
 
   defp genserver_function(:get), do: :call
@@ -430,7 +498,11 @@ defmodule GenServerMagic do
   @doc false
   def normalize_argument({:\\, _, _} = arg, _pos), do: arg
   def normalize_argument({:=, _, [_, arg]}, pos), do: normalize_argument(arg, pos)
-  def normalize_argument({:%, _, [{:__aliases__, _, _}, _arg]}, pos), do: {:"arg#{pos}", [], nil}
+
+  def normalize_argument({:%, _, [{:__aliases__, _, _}, _arg]} = arg, pos),
+    do: {:=, [], [arg, {:"arg#{pos}", [], nil}]}
+
+  def normalize_argument({:%{}, _, _} = arg, pos), do: {:=, [], [arg, {:"arg#{pos}", [], nil}]}
 
   def normalize_argument({arg, context, nil}, pos) when is_atom(arg) and is_list(context),
     do: normalize_argument(Atom.to_string(arg), arg, context, pos)
