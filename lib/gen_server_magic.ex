@@ -1,4 +1,6 @@
 defmodule GenServerMagic do
+  alias GenServerMagic.Utils
+
   @moduledoc """
   Documentation for GenServerMagic.
   """
@@ -11,7 +13,6 @@ defmodule GenServerMagic do
       @registered_name unquote(registered_name)
       @server_module unquote(server_module)
       Module.register_attribute(__MODULE__, :gen_server_methods, accumulate: true)
-      Module.register_attribute(__MODULE__, :api_methods, accumulate: true)
       @gen_server_methods {:use, GenServer}
       @before_compile unquote(__MODULE__)
       @compile :nowarn_unused_vars
@@ -151,7 +152,7 @@ defmodule GenServerMagic do
           {:use, module} ->
             {:use,
              quote do
-               @compile :nowarn_unused_vars
+               # @compile :nowarn_unused_vars
                @moduledoc false
                use unquote(module)
              end}
@@ -163,9 +164,9 @@ defmodule GenServerMagic do
              end}
 
           {:call, func_name, args, {from, state}, func_body, _when_clause} ->
-            n_args = GenServerMagic.normalize_arguments(args)
-            n_from = GenServerMagic.normalize_argument(from, 1)
-            n_state = GenServerMagic.normalize_argument(state, 1)
+            n_args = Utils.name_only_arguments(args, __MODULE__)
+            n_from = Utils.normalize_argument(from, length(args) + 1, __MODULE__)
+            n_state = Utils.normalize_argument(state, length(args) + 2, __MODULE__)
 
             {{:call, func_name, length(args), 2},
              quote do
@@ -185,8 +186,8 @@ defmodule GenServerMagic do
              end}
 
           {:call, func_name, args, state, func_body, _when_clause} ->
-            n_args = GenServerMagic.normalize_arguments(args)
-            n_state = GenServerMagic.normalize_argument(state, 1)
+            n_args = Utils.name_only_arguments(args, __MODULE__)
+            n_state = Utils.normalize_argument(state, length(args) + 1, __MODULE__)
 
             {{:call, func_name, length(args), 1},
              quote do
@@ -206,8 +207,8 @@ defmodule GenServerMagic do
              end}
 
           {:get, func_name, args, state, func_body, _when_clause} ->
-            n_args = GenServerMagic.normalize_arguments(args)
-            n_state = GenServerMagic.normalize_argument(state, 1)
+            n_args = Utils.name_only_arguments(args, __MODULE__)
+            n_state = Utils.normalize_argument(state, length(args) + 1, __MODULE__)
 
             {{:call, func_name, length(args), 1},
              quote do
@@ -230,8 +231,8 @@ defmodule GenServerMagic do
              end}
 
           {:update, func_name, args, state, func_body, _when_clause} ->
-            n_args = GenServerMagic.normalize_arguments(args)
-            n_state = GenServerMagic.normalize_argument(state, 1)
+            n_args = Utils.name_only_arguments(args, __MODULE__)
+            n_state = Utils.normalize_argument(state, length(args) + 1, __MODULE__)
 
             {{:call, func_name, length(args), 1},
              quote do
@@ -244,8 +245,8 @@ defmodule GenServerMagic do
              end}
 
           {:cast, func_name, args, state, func_body, _when_clause} ->
-            n_args = GenServerMagic.normalize_arguments(args)
-            n_state = GenServerMagic.normalize_argument(state, 1)
+            n_args = Utils.name_only_arguments(args, __MODULE__)
+            n_state = Utils.normalize_argument(state, length(args) + 1, __MODULE__)
 
             {{:cast, func_name, length(args)},
              quote do
@@ -266,7 +267,7 @@ defmodule GenServerMagic do
              end}
 
           {:info, message, state, func_body} ->
-            n_state = GenServerMagic.normalize_argument(state, 1)
+            n_state = Utils.normalize_argument(state, 1, __MODULE__)
 
             {:info,
              quote do
@@ -399,8 +400,8 @@ defmodule GenServerMagic do
 
     [state | rest] = Enum.reverse(args)
     local_args = Enum.reverse(rest)
-    n_local_args = strip_expanded_arguments(local_args)
-    server_args = Macro.escape(strip_optional_arguments(local_args))
+    n_local_args = Utils.normalize_arguments(local_args, __MODULE__)
+    server_args = Macro.escape(Utils.strip_optional_arguments(local_args))
     state = Macro.escape(state)
     func_body = Macro.escape(func_body)
     function_call = genserver_function(type)
@@ -412,112 +413,48 @@ defmodule GenServerMagic do
         @gen_server_methods {unquote(type), unquote(func_name), unquote(server_args),
                              unquote(state), unquote(func_body), unquote(escaped_when_clause)}
 
-        # Don't write an API function with the same signature (compiler warning)
-        unless Enum.find(@api_methods, fn
-                 {unquote(func_name), unquote(length(local_args))} -> true
-                 _ -> false
-               end) do
-          @api_methods {unquote(func_name), unquote(length(local_args))}
-
-          if @registered_name do
-            if unquote(has_when) do
-              def unquote(func_name)(unquote_splicing(n_local_args)) when unquote(when_clause),
-                do:
-                  GenServer.unquote(function_call)(
-                    @registered_name,
-                    {unquote(func_name), unquote(normalize_arguments(local_args))}
-                  )
-            else
-              def unquote(func_name)(unquote_splicing(n_local_args)),
-                do:
-                  GenServer.unquote(function_call)(
-                    @registered_name,
-                    {unquote(func_name), unquote(normalize_arguments(local_args))}
-                  )
-            end
+        if @registered_name do
+          if unquote(has_when) do
+            def unquote(func_name)(unquote_splicing(n_local_args)) when unquote(when_clause),
+              do:
+                GenServer.unquote(function_call)(
+                  @registered_name,
+                  {unquote(func_name), unquote(Utils.name_only_arguments(local_args, __MODULE__))}
+                )
           else
-            if unquote(has_when) do
-              def unquote(func_name)(pid, unquote_splicing(n_local_args))
-                  when is_pid(pid) and unquote(when_clause),
-                  do:
-                    GenServer.unquote(function_call)(
-                      pid,
-                      {unquote(func_name), unquote(normalize_arguments(local_args))}
-                    )
-            else
-              def unquote(func_name)(pid, unquote_splicing(n_local_args)) when is_pid(pid),
+            def unquote(func_name)(unquote_splicing(n_local_args)),
+              do:
+                GenServer.unquote(function_call)(
+                  @registered_name,
+                  {unquote(func_name), unquote(Utils.name_only_arguments(local_args, __MODULE__))}
+                )
+          end
+        else
+          if unquote(has_when) do
+            def unquote(func_name)(pid, unquote_splicing(n_local_args))
+                when is_pid(pid) and unquote(when_clause),
                 do:
                   GenServer.unquote(function_call)(
                     pid,
-                    {unquote(func_name), unquote(normalize_arguments(local_args))}
+                    {unquote(func_name),
+                     unquote(Utils.name_only_arguments(local_args, __MODULE__))}
                   )
-            end
+          else
+            def unquote(func_name)(pid, unquote_splicing(n_local_args)) when is_pid(pid),
+              do:
+                GenServer.unquote(function_call)(
+                  pid,
+                  {unquote(func_name), unquote(Utils.name_only_arguments(local_args, __MODULE__))}
+                )
           end
         end
       end
 
-    # IO.inspect(Macro.to_string(Macro.expand(quoted, __ENV__)), label: "quoted")
+    # IO.puts(Macro.to_string(Macro.expand(quoted, __ENV__)))
     quoted
   end
 
   defp genserver_function(:get), do: :call
   defp genserver_function(:update), do: :call
   defp genserver_function(type), do: type
-
-  defp strip_optional_arguments(args, acc \\ [])
-  defp strip_optional_arguments([], acc), do: Enum.reverse(acc)
-
-  defp strip_optional_arguments([{:\\, _, [arg, _value]} | tail], acc),
-    do: strip_optional_arguments(tail, [arg | acc])
-
-  defp strip_optional_arguments([arg | tail], acc),
-    do: strip_optional_arguments(tail, [arg | acc])
-
-  defp strip_expanded_arguments(args, acc \\ [])
-  defp strip_expanded_arguments([], acc), do: Enum.reverse(acc)
-
-  defp strip_expanded_arguments([{:=, _, [_arg, arg]} | tail], acc),
-    do: strip_expanded_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
-
-  defp strip_expanded_arguments([arg | tail], acc),
-    do: strip_expanded_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
-
-  @doc false
-  def normalize_arguments(args, acc \\ [])
-  def normalize_arguments([], acc), do: Enum.reverse(acc)
-
-  def normalize_arguments([{:\\, _, [arg, _value]} | tail], acc),
-    do: normalize_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
-
-  def normalize_arguments([{:=, _, [_, arg]} | tail], acc),
-    do: normalize_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
-
-  def normalize_arguments([arg | tail], acc),
-    do: normalize_arguments(tail, [normalize_argument(arg, length(acc)) | acc])
-
-  @doc false
-  def normalize_argument({:\\, _, _} = arg, _pos), do: arg
-  def normalize_argument({:=, _, [_, arg]}, pos), do: normalize_argument(arg, pos)
-
-  def normalize_argument({:%, _, [{:__aliases__, _, _}, _arg]} = arg, pos),
-    do: {:=, [], [arg, {:"arg#{pos}", [], nil}]}
-
-  def normalize_argument({:%{}, _, _} = arg, pos), do: {:=, [], [arg, {:"arg#{pos}", [], nil}]}
-
-  def normalize_argument({arg, context, nil}, pos) when is_atom(arg) and is_list(context),
-    do: normalize_argument(Atom.to_string(arg), arg, context, pos)
-
-  def normalize_argument(arg, pos) when is_tuple(arg) do
-    arg
-    |> Tuple.to_list()
-    |> Enum.map(&normalize_argument(&1, pos))
-    |> List.to_tuple()
-  end
-
-  def normalize_argument(arg, pos), do: {:=, [], [arg, {:"arg#{pos}", [], nil}]}
-
-  defp normalize_argument(<<"_", arg::binary>>, _original_arg, context, _pos),
-    do: {String.to_atom(arg), context, nil}
-
-  defp normalize_argument(_arg, original_arg, context, _pos), do: {original_arg, context, nil}
 end

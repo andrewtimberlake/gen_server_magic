@@ -70,6 +70,14 @@ defmodule GenServerMagicTest do
       {:reply, atom, state}
     end
 
+    defcall pattern_match(%{name: name}, state) do
+      pattern_match(name, state)
+    end
+
+    defcall pattern_match(name, state) do
+      {:reply, name, state}
+    end
+
     defcast cast_with_state(a, list) do
       [a | list]
     end
@@ -172,6 +180,17 @@ defmodule GenServerMagicTest do
     assert_raise FunctionClauseError, fn ->
       TestModule.func_with_guard(pid, "binary")
     end
+  end
+
+  test "call with pattern match" do
+    assert TestModule.Server.pattern_match(%{name: "Test name"}, nil) ==
+             {:reply, "Test name", nil}
+
+    assert TestModule.Server.pattern_match("Test name", nil) == {:reply, "Test name", nil}
+
+    {:ok, pid} = TestModule.start_link(nil)
+    assert TestModule.pattern_match(pid, %{name: "Test name"}) == "Test name"
+    assert TestModule.pattern_match(pid, "Test name") == "Test name"
   end
 
   describe "definit/1" do
