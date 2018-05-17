@@ -11,12 +11,12 @@ defmodule GenServerMagic.UtilsTest do
     test "it removes the default value from optional arguments" do
       {:def, _, [{:func, _, args}]} =
         quote do
-          def func(one, two \\ [], %{} = three)
+          def func(one, two \\ [], %{} = three, "string", 42, :atom, {:one, :two, :three})
         end
 
       {:def, _, [{:func, _, expected_args}]} =
         quote do
-          def func(one, two, %{} = three)
+          def func(one, two, %{} = three, "string", 42, :atom, {:one, :two, :three})
         end
 
       assert Utils.strip_optional_arguments(args) == expected_args
@@ -27,12 +27,32 @@ defmodule GenServerMagic.UtilsTest do
     test "it removes the pattern match from expanded arguments" do
       {:def, _, [{:func, _, args}]} =
         quote do
-          def func(%{} = one, [] = two, three, four \\ nil)
+          def func(
+                %{} = one,
+                [] = two,
+                three,
+                four \\ nil,
+                "string",
+                42,
+                :atom,
+                {:one, :two, :three},
+                abs(-1)
+              )
         end
 
       {:def, _, [{:func, _, expected_args}]} =
         quote do
-          def func(one, two, three, four \\ nil)
+          def func(
+                one,
+                two,
+                three,
+                four \\ nil,
+                "string",
+                42,
+                :atom,
+                {:one, :two, :three},
+                abs(-1)
+              )
         end
 
       assert Utils.strip_expanded_arguments(args) == expected_args
@@ -50,7 +70,13 @@ defmodule GenServerMagic.UtilsTest do
                 four \\ [],
                 %{name: name} = five,
                 [arg: :value] = six,
-                %TestStruct{name: :name}
+                %TestStruct{name: :name},
+                _eight,
+                "string",
+                42,
+                :atom,
+                {:one, :two, :three},
+                abs(-1)
               )
         end
 
@@ -63,7 +89,13 @@ defmodule GenServerMagic.UtilsTest do
                 four \\ [],
                 %{name: name} = five,
                 [arg: :value] = six,
-                %TestStruct{name: :name} = gsm_arg6
+                %TestStruct{name: :name} = gsm_arg6,
+                gsm_arg7,
+                "string" = gsm_arg8,
+                42 = gsm_arg9,
+                :atom = gsm_arg10,
+                {:one, :two, :three} = gsm_arg11,
+                abs(-1) = gsm_arg12
               )
         end
 
@@ -71,8 +103,8 @@ defmodule GenServerMagic.UtilsTest do
     end
   end
 
-  describe "name_only_arguments/2" do
-    test "it reduces all arguments to named versions" do
+  describe "rename_arguments/2" do
+    test "replaces all argument names" do
       {:def, _, [{:func, _, args}]} =
         quote do
           def func(
@@ -82,16 +114,49 @@ defmodule GenServerMagic.UtilsTest do
                 four \\ [],
                 %{name: name} = five,
                 [arg: :value] = six,
-                %TestStruct{name: :name}
+                %TestStruct{name: :name},
+                _eight,
+                "string",
+                42,
+                :atom,
+                {:one, :two, :three},
+                abs(-1)
               )
         end
 
       {:def, _, [{:func, _, expected_args}]} =
         quote do
-          def func(gsm_arg0, two, gsm_arg2, four, five, six, gsm_arg6)
+          def func(
+                %{} = gsm_arg0,
+                gsm_arg1,
+                [] = gsm_arg2,
+                gsm_arg3 \\ [],
+                %{name: name} = gsm_arg4,
+                [arg: :value] = gsm_arg5,
+                %TestStruct{name: :name} = gsm_arg6,
+                gsm_arg7,
+                "string" = gsm_arg8,
+                42 = gsm_arg9,
+                :atom = gsm_arg10,
+                {:one, :two, :three} = gsm_arg11,
+                abs(-1) = gsm_arg12
+              )
         end
 
-      assert Utils.name_only_arguments(args, __MODULE__) == expected_args
+      assert Utils.rename_arguments(args, __MODULE__) == expected_args
+    end
+  end
+
+  describe "strip_metadata/2" do
+    test "removes metadata from arguments" do
+      assert Utils.strip_metadata([
+               {:arg0, [line: 42], __MODULE__},
+               {:\\, [line: 42], [{:arg1, [line: 42], __MODULE__}, []]}
+             ]) ==
+               [
+                 {:arg0, [], __MODULE__},
+                 {:\\, [], [{:arg1, [], __MODULE__}, []]}
+               ]
     end
   end
 

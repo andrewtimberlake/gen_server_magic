@@ -78,6 +78,18 @@ defmodule GenServerMagicTest do
       {:reply, name, state}
     end
 
+    defcall pattern_match_state(id, %{name: name} = state) do
+      {:reply, {id, name}, state}
+    end
+
+    defcall pattern_match_state(id, %{age: age} = state) do
+      {:reply, {id, age}, state}
+    end
+
+    defcall pattern_match_state(id, state) do
+      {:reply, {id, state}, state}
+    end
+
     defcast cast_with_state(a, list) do
       [a | list]
     end
@@ -191,6 +203,23 @@ defmodule GenServerMagicTest do
     {:ok, pid} = TestModule.start_link(nil)
     assert TestModule.pattern_match(pid, %{name: "Test name"}) == "Test name"
     assert TestModule.pattern_match(pid, "Test name") == "Test name"
+  end
+
+  test "call with pattern match on state" do
+    assert TestModule.Server.pattern_match_state(13, %{name: "Test name"}) ==
+             {:reply, {13, "Test name"}, %{name: "Test name"}}
+
+    assert TestModule.Server.pattern_match_state(13, %{age: 21}) == {:reply, {13, 21}, %{age: 21}}
+
+    assert TestModule.Server.pattern_match_state(13, "Test name") ==
+             {:reply, {13, "Test name"}, "Test name"}
+
+    {:ok, pid} = TestModule.start_link(%{name: "Test name"})
+    assert TestModule.pattern_match_state(pid, 13) == {13, "Test name"}
+    {:ok, pid} = TestModule.start_link(%{age: 21})
+    assert TestModule.pattern_match_state(pid, 13) == {13, 21}
+    {:ok, pid} = TestModule.start_link("Test name")
+    assert TestModule.pattern_match_state(pid, 13) == {13, "Test name"}
   end
 
   describe "definit/1" do

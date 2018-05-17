@@ -13,6 +13,7 @@ defmodule GenServerMagic do
       @registered_name unquote(registered_name)
       @server_module unquote(server_module)
       Module.register_attribute(__MODULE__, :gen_server_methods, accumulate: true)
+      Module.register_attribute(__MODULE__, :api_methods, accumulate: true)
       @gen_server_methods {:use, GenServer}
       @before_compile unquote(__MODULE__)
       @compile :nowarn_unused_vars
@@ -152,7 +153,7 @@ defmodule GenServerMagic do
           {:use, module} ->
             {:use,
              quote do
-               # @compile :nowarn_unused_vars
+               @compile :nowarn_unused_vars
                @moduledoc false
                use unquote(module)
              end}
@@ -165,66 +166,40 @@ defmodule GenServerMagic do
 
           {:call, func_name, args, {from, state}, func_body, _when_clause} ->
             n_args = Utils.name_only_arguments(args, __MODULE__)
-            n_from = Utils.normalize_argument(from, length(args) + 1, __MODULE__)
-            n_state = Utils.normalize_argument(state, length(args) + 2, __MODULE__)
 
             {{:call, func_name, length(args), 2},
              quote do
                # def handle_call({fun_name, [a, b]}, from, state) do
                #   func_name(a, b, {from, state})
                # end
-               def handle_call(
-                     {unquote(func_name), unquote(n_args)},
-                     unquote(n_from),
-                     unquote(n_state)
-                   ) do
-                 unquote(func_name)(
-                   unquote_splicing(n_args),
-                   {unquote(n_from), unquote(state)}
-                 )
+               def handle_call({unquote(func_name), unquote(n_args)}, gsm_from, gsm_state) do
+                 unquote(func_name)(unquote_splicing(n_args), {gsm_from, gsm_state})
                end
              end}
 
           {:call, func_name, args, state, func_body, _when_clause} ->
             n_args = Utils.name_only_arguments(args, __MODULE__)
-            n_state = Utils.normalize_argument(state, length(args) + 1, __MODULE__)
 
             {{:call, func_name, length(args), 1},
              quote do
                # def handle_call({fun_name, [a, b]}, from, state) do
                #   func_name(a, b, state)
                # end
-               def handle_call(
-                     {unquote(func_name), unquote(n_args)},
-                     _from,
-                     unquote(n_state)
-                   ) do
-                 unquote(func_name)(
-                   unquote_splicing(n_args),
-                   unquote(n_state)
-                 )
+               def handle_call({unquote(func_name), unquote(n_args)}, _from, gsm_state) do
+                 unquote(func_name)(unquote_splicing(n_args), gsm_state)
                end
              end}
 
           {:get, func_name, args, state, func_body, _when_clause} ->
             n_args = Utils.name_only_arguments(args, __MODULE__)
-            n_state = Utils.normalize_argument(state, length(args) + 1, __MODULE__)
 
             {{:call, func_name, length(args), 1},
              quote do
                # def handle_call({fun_name, [a, b]}, from, state) do
                #   func_name(a, b, state)
                # end
-               def handle_call(
-                     {unquote(func_name), unquote(n_args)},
-                     _from,
-                     unquote(n_state)
-                   ) do
-                 {reply, new_state} =
-                   unquote(func_name)(
-                     unquote_splicing(n_args),
-                     unquote(n_state)
-                   )
+               def handle_call({unquote(func_name), unquote(n_args)}, _from, gsm_state) do
+                 {reply, new_state} = unquote(func_name)(unquote_splicing(n_args), gsm_state)
 
                  {:reply, reply, new_state}
                end
@@ -232,32 +207,27 @@ defmodule GenServerMagic do
 
           {:update, func_name, args, state, func_body, _when_clause} ->
             n_args = Utils.name_only_arguments(args, __MODULE__)
-            n_state = Utils.normalize_argument(state, length(args) + 1, __MODULE__)
 
             {{:call, func_name, length(args), 1},
              quote do
                # def handle_call({fun_name, [a, b]}, from, state) do
                #   func_name(a, b, state)
                # end
-               def handle_call({unquote(func_name), unquote(n_args)}, _from, unquote(n_state)) do
-                 {:reply, :ok, unquote(func_name)(unquote_splicing(n_args), unquote(n_state))}
+               def handle_call({unquote(func_name), unquote(n_args)}, _from, gsm_state) do
+                 {:reply, :ok, unquote(func_name)(unquote_splicing(n_args), gsm_state)}
                end
              end}
 
           {:cast, func_name, args, state, func_body, _when_clause} ->
             n_args = Utils.name_only_arguments(args, __MODULE__)
-            n_state = Utils.normalize_argument(state, length(args) + 1, __MODULE__)
 
             {{:cast, func_name, length(args)},
              quote do
                # def handle_cast({fun_name, [a, b]}, state) do
                #   func_name(a, b, state)
                # end
-               def handle_cast({unquote(func_name), unquote(n_args)}, unquote(n_state)) do
-                 case unquote(func_name)(
-                        unquote_splicing(n_args),
-                        unquote(n_state)
-                      ) do
+               def handle_cast({unquote(func_name), unquote(n_args)}, gsm_state) do
+                 case unquote(func_name)(unquote_splicing(n_args), gsm_state) do
                    {:noreply, new_state} -> {:noreply, new_state}
                    {:noreply, new_state, timeout} -> {:noreply, new_state, timeout}
                    {:stop, reason, new_state} -> {:stop, reason, new_state}
@@ -267,15 +237,13 @@ defmodule GenServerMagic do
              end}
 
           {:info, message, state, func_body} ->
-            n_state = Utils.normalize_argument(state, 1, __MODULE__)
-
             {:info,
              quote do
                # def handle_info({fun_name, a, b}, state) do
                #   func_name(a, b, state)
                # end
-               def handle_info(message, unquote(n_state)) do
-                 case info(message, unquote(n_state)) do
+               def handle_info(message, gsm_state) do
+                 case info(message, gsm_state) do
                    {:noreply, new_state} -> {:noreply, new_state}
                    {:noreply, new_state, timeout} -> {:noreply, new_state, timeout}
                    {:stop, reason, new_state} -> {:stop, reason, new_state}
@@ -413,39 +381,60 @@ defmodule GenServerMagic do
         @gen_server_methods {unquote(type), unquote(func_name), unquote(server_args),
                              unquote(state), unquote(func_body), unquote(escaped_when_clause)}
 
-        if @registered_name do
-          if unquote(has_when) do
-            def unquote(func_name)(unquote_splicing(n_local_args)) when unquote(when_clause),
-              do:
-                GenServer.unquote(function_call)(
-                  @registered_name,
-                  {unquote(func_name), unquote(Utils.name_only_arguments(local_args, __MODULE__))}
-                )
+        unless Enum.find(@api_methods, fn
+                 {unquote(func_name),
+                  unquote(
+                    Macro.escape(Utils.rename_arguments(Utils.strip_metadata(local_args), nil))
+                  )} ->
+                   true
+
+                 _ ->
+                   false
+               end) do
+          @api_methods {unquote(func_name),
+                        unquote(
+                          Macro.escape(
+                            Utils.rename_arguments(Utils.strip_metadata(local_args), nil)
+                          )
+                        )}
+
+          if @registered_name do
+            if unquote(has_when) do
+              def unquote(func_name)(unquote_splicing(n_local_args)) when unquote(when_clause),
+                do:
+                  GenServer.unquote(function_call)(
+                    @registered_name,
+                    {unquote(func_name),
+                     unquote(Utils.name_only_arguments(local_args, __MODULE__))}
+                  )
+            else
+              def unquote(func_name)(unquote_splicing(n_local_args)),
+                do:
+                  GenServer.unquote(function_call)(
+                    @registered_name,
+                    {unquote(func_name),
+                     unquote(Utils.name_only_arguments(local_args, __MODULE__))}
+                  )
+            end
           else
-            def unquote(func_name)(unquote_splicing(n_local_args)),
-              do:
-                GenServer.unquote(function_call)(
-                  @registered_name,
-                  {unquote(func_name), unquote(Utils.name_only_arguments(local_args, __MODULE__))}
-                )
-          end
-        else
-          if unquote(has_when) do
-            def unquote(func_name)(pid, unquote_splicing(n_local_args))
-                when is_pid(pid) and unquote(when_clause),
+            if unquote(has_when) do
+              def unquote(func_name)(pid, unquote_splicing(n_local_args))
+                  when is_pid(pid) and unquote(when_clause),
+                  do:
+                    GenServer.unquote(function_call)(
+                      pid,
+                      {unquote(func_name),
+                       unquote(Utils.name_only_arguments(local_args, __MODULE__))}
+                    )
+            else
+              def unquote(func_name)(pid, unquote_splicing(n_local_args)) when is_pid(pid),
                 do:
                   GenServer.unquote(function_call)(
                     pid,
                     {unquote(func_name),
                      unquote(Utils.name_only_arguments(local_args, __MODULE__))}
                   )
-          else
-            def unquote(func_name)(pid, unquote_splicing(n_local_args)) when is_pid(pid),
-              do:
-                GenServer.unquote(function_call)(
-                  pid,
-                  {unquote(func_name), unquote(Utils.name_only_arguments(local_args, __MODULE__))}
-                )
+            end
           end
         end
       end
