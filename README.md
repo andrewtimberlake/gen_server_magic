@@ -8,7 +8,7 @@ Add `gen_server_magic` as a dependency in your project in your `mix.exs` file:
 ```elixir
 def deps do
   [
-    {:gen_server_magic, "~> 0.0.6"}
+    {:gen_server_magic, "~> 0.0.7"}
   ]
 end
 ```

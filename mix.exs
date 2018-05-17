@@ -1,7 +1,7 @@
 defmodule GenServerMagic.MixProject do
   use Mix.Project
 
-  @version "0.0.6"
+  @version "0.0.7"
   @github_url "https://github.com/andrewtimberlake/gen_server_magic"
 
   def project do
