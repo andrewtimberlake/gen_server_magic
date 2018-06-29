@@ -367,14 +367,31 @@ defmodule GenServerMagic do
       end
 
     [state | rest] = Enum.reverse(args)
+
+    {state, timeout, rest} =
+      case state do
+        [timeout: timeout] ->
+          [state | rest] = rest
+          {state, timeout, rest}
+
+        state ->
+          {state, nil, rest}
+      end
+
     local_args = Enum.reverse(rest)
     n_local_args = Utils.normalize_arguments(local_args, __MODULE__)
+    n_only_args = Utils.name_only_arguments(local_args, __MODULE__)
     server_args = Macro.escape(Utils.strip_optional_arguments(local_args))
     state = Macro.escape(state)
     func_body = Macro.escape(func_body)
     function_call = genserver_function(type)
     escaped_when_clause = Macro.escape(when_clause)
     has_when = !!when_clause
+
+    gen_call_args =
+      if function_call == :call && timeout,
+        do: [{func_name, n_only_args}, timeout],
+        else: [{func_name, n_only_args}]
 
     quoted =
       quote do
@@ -400,21 +417,19 @@ defmodule GenServerMagic do
 
           if @registered_name do
             if unquote(has_when) do
-              def unquote(func_name)(unquote_splicing(n_local_args)) when unquote(when_clause),
-                do:
-                  GenServer.unquote(function_call)(
-                    @registered_name,
-                    {unquote(func_name),
-                     unquote(Utils.name_only_arguments(local_args, __MODULE__))}
-                  )
+              def unquote(func_name)(unquote_splicing(n_local_args)) when unquote(when_clause) do
+                GenServer.unquote(function_call)(
+                  @registered_name,
+                  unquote_splicing(gen_call_args)
+                )
+              end
             else
-              def unquote(func_name)(unquote_splicing(n_local_args)),
-                do:
-                  GenServer.unquote(function_call)(
-                    @registered_name,
-                    {unquote(func_name),
-                     unquote(Utils.name_only_arguments(local_args, __MODULE__))}
-                  )
+              def unquote(func_name)(unquote_splicing(n_local_args)) do
+                GenServer.unquote(function_call)(
+                  @registered_name,
+                  unquote_splicing(gen_call_args)
+                )
+              end
             end
           else
             if unquote(has_when) do
@@ -423,16 +438,14 @@ defmodule GenServerMagic do
                   do:
                     GenServer.unquote(function_call)(
                       pid,
-                      {unquote(func_name),
-                       unquote(Utils.name_only_arguments(local_args, __MODULE__))}
+                      unquote_splicing(gen_call_args)
                     )
             else
               def unquote(func_name)(pid, unquote_splicing(n_local_args)) when is_pid(pid),
                 do:
                   GenServer.unquote(function_call)(
                     pid,
-                    {unquote(func_name),
-                     unquote(Utils.name_only_arguments(local_args, __MODULE__))}
+                    unquote_splicing(gen_call_args)
                   )
             end
           end

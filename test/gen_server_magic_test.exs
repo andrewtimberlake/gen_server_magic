@@ -20,12 +20,22 @@ defmodule GenServerMagicTest do
       {state, state}
     end
 
+    defget get_with_timeout(state, timeout: 500) do
+      Process.sleep(1000)
+      {state, state}
+    end
+
     defget pop(list) do
       [item | tail] = Enum.reverse(list)
       {item, Enum.reverse(tail)}
     end
 
     defupdate push(item, list) do
+      Enum.reverse([item | list])
+    end
+
+    defupdate update_with_timeout(item, list, timeout: 500) do
+      Process.sleep(1000)
       Enum.reverse([item | list])
     end
 
@@ -87,6 +97,11 @@ defmodule GenServerMagicTest do
     end
 
     defcall pattern_match_state(id, state) do
+      {:reply, {id, state}, state}
+    end
+
+    defcall call_with_timeout(id, state, timeout: 500) do
+      Process.sleep(1_000)
       {:reply, {id, state}, state}
     end
 
@@ -254,6 +269,13 @@ defmodule GenServerMagicTest do
       {:ok, pid} = TestModule.start_link(3)
       assert {1, 2, :optional, 3} = TestModule.call_with_optional_args(pid, 1, 2)
     end
+
+    test "set a timeout" do
+      assert {:reply, {13, :state}, :state} = TestModule.Server.call_with_timeout(13, :state)
+
+      {:ok, pid} = TestModule.start_link()
+      assert catch_exit(TestModule.call_with_timeout(pid, 13))
+    end
   end
 
   describe "defcast/2" do
@@ -281,6 +303,11 @@ defmodule GenServerMagicTest do
       assert TestModule.pop(pid) == 3
       assert TestModule.get_state(pid) == [1, 2]
     end
+
+    test "with timeout" do
+      {:ok, pid} = TestModule.start_link(:state)
+      assert catch_exit(TestModule.get_with_timeout(pid))
+    end
   end
 
   describe "defupdate/2" do
@@ -298,6 +325,11 @@ defmodule GenServerMagicTest do
       {:ok, pid} = TestModule.start_link([1, 2, 3])
       assert TestModule.pop(pid) == 3
       assert TestModule.get_state(pid) == [1, 2]
+    end
+
+    test "with timeout" do
+      {:ok, pid} = TestModule.start_link([1])
+      assert catch_exit(TestModule.update_with_timeout(pid, 2))
     end
   end
 
