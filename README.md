@@ -114,7 +114,7 @@ defmodule MyModule do
       {:reply, :ok, state}
     end
 
-    def early_return(arg1, arg2, state) do
+    def early_return(arg1, arg2, {from, state}) do
       GenServer.reply(from, :ok)
       Logger.info("Doing work after return")
       {:noreply, state}
