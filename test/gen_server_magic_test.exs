@@ -17,12 +17,12 @@ defmodule GenServerMagicTest do
     end
 
     defget get_state(state) do
-      {state, state}
+      state
     end
 
     defget get_with_timeout(state, timeout: 500) do
       Process.sleep(1000)
-      {state, state}
+      state
     end
 
     defget pop(list) do
@@ -290,7 +290,7 @@ defmodule GenServerMagicTest do
 
   describe "defget/2" do
     test "return the state" do
-      assert {:state, :state} = TestModule.Server.get_state(:state)
+      assert :state = TestModule.Server.get_state(:state)
 
       {:ok, pid} = TestModule.start_link(:state)
       assert TestModule.get_state(pid) == :state

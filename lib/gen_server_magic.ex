@@ -199,7 +199,11 @@ defmodule GenServerMagic do
                #   func_name(a, b, state)
                # end
                def handle_call({unquote(func_name), unquote(n_args)}, _from, gsm_state) do
-                 {reply, new_state} = unquote(func_name)(unquote_splicing(n_args), gsm_state)
+                 {reply, new_state} =
+                   case unquote(func_name)(unquote_splicing(n_args), gsm_state) do
+                     {reply, new_state} -> {reply, new_state}
+                     reply -> {reply, gsm_state}
+                   end
 
                  {:reply, reply, new_state}
                end
