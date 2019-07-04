@@ -7,6 +7,37 @@ defmodule GenServerMagic.UtilsTest do
     defstruct name: nil
   end
 
+  describe "remove_names_not_in_when/2" do
+    test "it removes the variable names not used in the when clause" do
+      when_clause =
+        {:or, [line: 75],
+         [
+           {:is_binary, [line: 75], [{:name, [line: 75], nil}]},
+           {:is_nil, [line: 75], [{:name, [line: 75], nil}]}
+         ]}
+
+      args = [
+        {:=, [],
+         [
+           {:%{}, [line: 75], [name: {:name, [line: 75], nil}, other: {:other, [line: 75], nil}]},
+           {:gsm_arg0, [], GenServerMagic}
+         ]},
+        {:gsm_arg1, [], GenServerMagic}
+      ]
+
+      expected_args = [
+        {:=, [],
+         [
+           {:%{}, [line: 75], [name: {:name, [line: 75], nil}, other: {:_, [line: 75], nil}]},
+           {:gsm_arg0, [], GenServerMagic}
+         ]},
+        {:gsm_arg1, [], GenServerMagic}
+      ]
+
+      assert Utils.remove_names_not_in_when(args, when_clause) == expected_args
+    end
+  end
+
   describe "strip_optional_arguments/1" do
     test "it removes the default value from optional arguments" do
       {:def, _, [{:func, _, args}]} =

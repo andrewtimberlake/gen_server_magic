@@ -1,4 +1,53 @@
 defmodule GenServerMagic.Utils do
+  def remove_names_not_in_when(args, when_clause) do
+    required_names = if when_clause, do: Enum.uniq(names_in_when(when_clause)), else: []
+    remove_names_from_args(args, required_names)
+  end
+
+  defp remove_names_from_args([], _required_names), do: []
+
+  defp remove_names_from_args([{:__aliases__, meta, arguments} | args], required_names) do
+    [{:__aliases__, meta, arguments} | remove_names_from_args(args, required_names)]
+  end
+
+  defp remove_names_from_args([{name, meta, arguments} | args], required_names)
+       when is_list(arguments) do
+    [
+      {name, meta, remove_names_from_args(arguments, required_names)}
+      | remove_names_from_args(args, required_names)
+    ]
+  end
+
+  defp remove_names_from_args([{key, {name, meta, context}} = arg | args], required_names)
+       when is_atom(context) do
+    if name in required_names do
+      [arg | remove_names_from_args(args, required_names)]
+    else
+      [{key, {:_, meta, context}} | remove_names_from_args(args, required_names)]
+    end
+  end
+
+  defp remove_names_from_args([{_, _, context} = arg | args], required_names)
+       when is_atom(context) do
+    [arg | remove_names_from_args(args, required_names)]
+  end
+
+  defp remove_names_from_args([arg | args], required_names) do
+    [arg | remove_names_from_args(args, required_names)]
+  end
+
+  defp names_in_when({name, _, context}) when is_atom(context), do: [name]
+
+  defp names_in_when({_, _, args}) when is_list(args) do
+    names_in_when(args)
+  end
+
+  defp names_in_when([]), do: []
+
+  defp names_in_when([arg | args]) do
+    names_in_when(arg) ++ names_in_when(args)
+  end
+
   @doc ~S"""
   Removes the default value from optional arguments
   """

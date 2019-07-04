@@ -72,8 +72,9 @@ defmodule GenServerMagicTest do
       {:reply, "the answer to the question", state}
     end
 
-    defcall match_with_guard(%{name: name}, state) when is_binary(name) do
-      {:reply, name, state}
+    defcall match_with_guard(%{name: name, other: other}, state)
+            when is_binary(name) or is_nil(name) do
+      {:reply, {name, other}, state}
     end
 
     defcall func_with_guard(atom, state) when is_atom(atom) do
@@ -180,14 +181,15 @@ defmodule GenServerMagicTest do
   end
 
   test "call with match and guard" do
-    assert TestModule.Server.match_with_guard(%{name: "name"}, nil) == {:reply, "name", nil}
+    assert TestModule.Server.match_with_guard(%{name: "name", other: "other"}, nil) ==
+             {:reply, {"name", "other"}, nil}
 
     assert_raise FunctionClauseError, fn ->
       TestModule.Server.match_with_guard(%{name: :name}, nil)
     end
 
     {:ok, pid} = TestModule.start_link(nil)
-    assert TestModule.match_with_guard(pid, %{name: "name"}) == "name"
+    assert TestModule.match_with_guard(pid, %{name: "name", other: "other"}) == {"name", "other"}
 
     assert_raise FunctionClauseError, fn ->
       TestModule.match_with_guard(pid, %{name: :name})

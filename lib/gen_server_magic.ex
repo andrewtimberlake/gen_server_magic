@@ -383,7 +383,12 @@ defmodule GenServerMagic do
       end
 
     local_args = Enum.reverse(rest)
-    n_local_args = Utils.normalize_arguments(local_args, __MODULE__)
+
+    n_local_args =
+      local_args
+      |> Utils.normalize_arguments(__MODULE__)
+      |> Utils.remove_names_not_in_when(when_clause)
+
     n_only_args = Utils.name_only_arguments(local_args, __MODULE__)
     server_args = Macro.escape(Utils.strip_optional_arguments(local_args))
     state = Macro.escape(state)

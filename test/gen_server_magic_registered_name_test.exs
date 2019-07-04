@@ -33,11 +33,11 @@ defmodule GenServerMagicRegisteredNamedTest do
       Map.put(state, :id, :name)
     end
 
-    defupdate update_pattern_match_state(id, %{age: age} = state) do
+    defupdate update_pattern_match_state(id, %{age: _age} = state) do
       Map.put(state, :id, id)
     end
 
-    defupdate update_pattern_match_state(id, state) do
+    defupdate update_pattern_match_state(_id, state) do
       state
     end
   end
