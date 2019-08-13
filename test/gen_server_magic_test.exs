@@ -110,6 +110,14 @@ defmodule GenServerMagicTest do
       [a | list]
     end
 
+    defcontinue(:do_continue, _state) do
+      {:noreply, :did_continue}
+    end
+
+    definfo({:info_then_continue, new_state}, _state) do
+      {:noreply, new_state, {:continue, :do_continue}}
+    end
+
     definfo({:info_with_state, a, b}, list) do
       [b | [a | list]]
     end
@@ -332,6 +340,43 @@ defmodule GenServerMagicTest do
     test "with timeout" do
       {:ok, pid} = TestModule.start_link([1])
       assert catch_exit(TestModule.update_with_timeout(pid, 2))
+    end
+  end
+
+  :otp_release
+  |> :erlang.system_info()
+  |> to_string()
+  |> Integer.parse()
+  |> case do
+    {version, _} -> version >= 21
+    _ -> false
+  end
+  |> if do
+    describe "defcontinue/2" do
+      test "it generates a handle_continue callback" do
+        assert {:noreply, :did_continue} = TestModule.Server.continue(:do_continue, nil)
+
+        {:ok, pid} = TestModule.start_link([1])
+        send(pid, {:info_then_continue, :info})
+        assert TestModule.get_state(pid) == :did_continue
+      end
+
+      test "it generates a handle_info callback that handles arbitrary arguments" do
+        assert :state = TestModule.Server.info(:some_message, :state)
+
+        {:ok, pid} = TestModule.start_link(:state)
+        send(pid, :some_message)
+        assert TestModule.get_state(pid) == :state
+      end
+
+      @tag :capture_log
+      test "unhandled message" do
+        {:ok, pid} = TestModule.start_link(:state)
+        Process.flag(:trap_exit, true)
+        send(pid, :wrong_message)
+
+        assert_receive {:EXIT, ^pid, _}
+      end
     end
   end
 

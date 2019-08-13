@@ -132,6 +132,12 @@ defmodule GenServerMagic do
                   do: unquote(func_body)
             end
 
+          {:continue, continue, state, func_body} ->
+            quote do
+              # def continue(continue, state)
+              def continue(unquote(continue), unquote(state)), do: unquote(func_body)
+            end
+
           {:info, message, state, func_body} ->
             quote do
               # def info(message, state)
@@ -233,7 +239,23 @@ defmodule GenServerMagic do
                def handle_cast({unquote(func_name), unquote(n_args)}, gsm_state) do
                  case unquote(func_name)(unquote_splicing(n_args), gsm_state) do
                    {:noreply, new_state} -> {:noreply, new_state}
-                   {:noreply, new_state, timeout} -> {:noreply, new_state, timeout}
+                   {:noreply, new_state, other} -> {:noreply, new_state, other}
+                   {:stop, reason, new_state} -> {:stop, reason, new_state}
+                   new_state -> {:noreply, new_state}
+                 end
+               end
+             end}
+
+          {:continue, continue, state, func_body} ->
+            {:continue,
+             quote do
+               # def handle_continue({fun_name, a, b}, state) do
+               #   func_name(a, b, state)
+               # end
+               def handle_continue(continue, gsm_state) do
+                 case continue(continue, gsm_state) do
+                   {:noreply, new_state} -> {:noreply, new_state}
+                   {:noreply, new_state, other} -> {:noreply, new_state, other}
                    {:stop, reason, new_state} -> {:stop, reason, new_state}
                    new_state -> {:noreply, new_state}
                  end
@@ -249,7 +271,7 @@ defmodule GenServerMagic do
                def handle_info(message, gsm_state) do
                  case info(message, gsm_state) do
                    {:noreply, new_state} -> {:noreply, new_state}
-                   {:noreply, new_state, timeout} -> {:noreply, new_state, timeout}
+                   {:noreply, new_state, other} -> {:noreply, new_state, other}
                    {:stop, reason, new_state} -> {:stop, reason, new_state}
                    new_state -> {:noreply, new_state}
                  end
@@ -315,6 +337,16 @@ defmodule GenServerMagic do
 
   defmacro defcast({func_name, _context, args}, expr \\ nil) do
     define_callbacks(:cast, func_name, args, expr)
+  end
+
+  defmacro defcontinue(continue, state, do: func_body) do
+    continue = Macro.escape(continue)
+    state = Macro.escape(state)
+    func_body = Macro.escape(func_body)
+
+    quote do
+      @gen_server_methods {:continue, unquote(continue), unquote(state), unquote(func_body)}
+    end
   end
 
   defmacro definfo(message, state, do: func_body) do
